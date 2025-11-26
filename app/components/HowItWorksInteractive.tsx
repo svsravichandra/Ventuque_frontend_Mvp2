@@ -60,112 +60,27 @@ const stages = [
 export default function HowItWorksInteractive() {
     const sectionRef = useRef<HTMLDivElement>(null);
     const containerRef = useRef<HTMLDivElement>(null);
-    const canvasRef = useRef<HTMLCanvasElement>(null);
-    const cursorRef = useRef<HTMLDivElement>(null);
     const [currentStage, setCurrentStage] = useState(0);
     const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
-    const [particles, setParticles] = useState<Array<{ x: number; y: number; vx: number; vy: number; life: number }>>([]);
 
-    // Enhanced mouse move for parallax, magnetic effects, and custom cursor
+    // Optimized mouse move for parallax only
     const handleMouseMove = (e: MouseEvent) => {
         if (!sectionRef.current) return;
         const rect = sectionRef.current.getBoundingClientRect();
         const x = (e.clientX - rect.left) / rect.width - 0.5;
         const y = (e.clientY - rect.top) / rect.height - 0.5;
-        setMousePos({ x, y });
 
-        // Update custom cursor position
-        if (cursorRef.current) {
-            cursorRef.current.style.left = `${e.clientX}px`;
-            cursorRef.current.style.top = `${e.clientY}px`;
-        }
-
-        // Magnetic effect on interactive elements
-        const magneticElements = document.querySelectorAll('.magnetic-element');
-        magneticElements.forEach((el) => {
-            const htmlEl = el as HTMLElement;
-            const elRect = htmlEl.getBoundingClientRect();
-            const elCenterX = elRect.left + elRect.width / 2;
-            const elCenterY = elRect.top + elRect.height / 2;
-            const deltaX = e.clientX - elCenterX;
-            const deltaY = e.clientY - elCenterY;
-            const distance = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
-            const magneticRadius = 120;
-
-            if (distance < magneticRadius) {
-                const strength = (1 - distance / magneticRadius) * 15;
-                htmlEl.style.transform = `translate(${deltaX * strength / 100}px, ${deltaY * strength / 100}px) scale(1.05)`;
-            } else {
-                htmlEl.style.transform = 'translate(0, 0) scale(1)';
-            }
-        });
-    };
-
-    // Canvas particle animation effect
-    useEffect(() => {
-        const canvas = canvasRef.current;
-        if (!canvas) return;
-
-        const ctx = canvas.getContext('2d');
-        if (!ctx) return;
-
-        const resizeCanvas = () => {
-            canvas.width = window.innerWidth;
-            canvas.height = window.innerHeight;
-        };
-        resizeCanvas();
-        window.addEventListener('resize', resizeCanvas);
-
-        let particleArray: Array<{ x: number; y: number; vx: number; vy: number; life: number; color: string; size: number }> = [];
-
-        const createParticleBurst = (x: number, y: number, color: string, count = 30) => {
-            for (let i = 0; i < count; i++) {
-                const angle = (Math.PI * 2 * i) / count;
-                const velocity = 2 + Math.random() * 3;
-                particleArray.push({
-                    x,
-                    y,
-                    vx: Math.cos(angle) * velocity,
-                    vy: Math.sin(angle) * velocity,
-                    life: 1,
-                    color,
-                    size: 2 + Math.random() * 4
-                });
-            }
-        };
-
-        // Trigger particle burst on stage change
-        const triggerBurst = () => {
-            const color = stages[currentStage].color;
-            createParticleBurst(canvas.width / 2, canvas.height / 2, color, 50);
-        };
-
-        const animate = () => {
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-            particleArray = particleArray.filter(p => p.life > 0);
-
-            particleArray.forEach(particle => {
-                particle.x += particle.vx;
-                particle.y += particle.vy;
-                particle.vy += 0.1; // gravity
-                particle.life -= 0.01;
-
-                ctx.beginPath();
-                ctx.arc(particle.x, particle.y, particle.size, 0, Math.PI * 2);
-                ctx.fillStyle = particle.color + Math.floor(particle.life * 255).toString(16).padStart(2, '0');
-                ctx.fill();
+        // Throttle updates using requestAnimationFrame
+        if (!sectionRef.current.dataset.ticking) {
+            window.requestAnimationFrame(() => {
+                setMousePos({ x, y });
+                if (sectionRef.current) {
+                    sectionRef.current.dataset.ticking = '';
+                }
             });
-
-            requestAnimationFrame(animate);
-        };
-
-        animate();
-
-        return () => {
-            window.removeEventListener('resize', resizeCanvas);
-        };
-    }, [currentStage]);
+            sectionRef.current.dataset.ticking = 'true';
+        }
+    };
 
     // Use useLayoutEffect for GSAP to prevent flash of unstyled content and ensure measurements are correct
     // We use a safe version that falls back to useEffect on the server
@@ -385,25 +300,7 @@ export default function HowItWorksInteractive() {
     }, [currentStage]);
 
     return (
-        <div className="relative w-full cursor-none"> {/* Wrapper to isolate GSAP pinning from React tree */}
-            {/* Custom Cursor */}
-            <div
-                ref={cursorRef}
-                className="custom-cursor fixed w-8 h-8 pointer-events-none z-[9999] mix-blend-difference"
-                style={{
-                    transform: 'translate(-50%, -50%)',
-                    transition: 'width 0.3s, height 0.3s'
-                }}
-            >
-                <div className="w-full h-full rounded-full border-2 border-white animate-pulse" />
-            </div>
-
-            {/* Particle Canvas */}
-            <canvas
-                ref={canvasRef}
-                className="fixed inset-0 pointer-events-none z-20 mix-blend-screen"
-            />
-
+        <div className="relative w-full"> {/* Wrapper to isolate GSAP pinning from React tree */}
             <section
                 ref={sectionRef}
                 className="relative h-screen bg-bg-primary overflow-hidden"
@@ -524,7 +421,7 @@ export default function HowItWorksInteractive() {
                                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-20 items-center">
                                         {/* Content */}
                                         <div className="text-center lg:text-left order-2 lg:order-1">
-                                            <div className="animate-in magnetic-element inline-flex items-center gap-3 px-5 py-3 rounded-full mb-8 bg-gradient-to-r from-white/10 to-white/5 border border-white/20 backdrop-blur-xl shadow-lg transition-all duration-300">
+                                            <div className="animate-in inline-flex items-center gap-3 px-5 py-3 rounded-full mb-8 bg-gradient-to-r from-white/10 to-white/5 border border-white/20 backdrop-blur-xl shadow-lg transition-all duration-300">
                                                 <span className="stage-icon text-2xl" style={{ filter: 'drop-shadow(0 0 8px currentColor)' }}>{stage.icon}</span>
                                                 <span className="text-sm font-bold tracking-widest uppercase" style={{ color: stage.color, textShadow: `0 0 20px ${stage.color}88` }}>
                                                     STAGE 0{stage.id}
@@ -559,9 +456,9 @@ export default function HowItWorksInteractive() {
                                             </div>
                                         </div>
 
-                                        {/* Enhanced Image Card with 3D Depth and Magnetic Effects */}
+                                        {/* Enhanced Image Card with 3D Depth */}
                                         <div className="flex justify-center order-1 lg:order-2" style={{ perspective: '1500px' }}>
-                                            <div className="floating-element magnetic-element relative w-full max-w-lg aspect-square transition-transform duration-300">
+                                            <div className="floating-element relative w-full max-w-lg aspect-square transition-transform duration-300">
                                                 {/* Multi-layer animated glow orbs */}
                                                 <div
                                                     className="glow-orb absolute inset-[-20%] rounded-full opacity-40 transition-all duration-1000"
@@ -636,21 +533,6 @@ export default function HowItWorksInteractive() {
                                                     <svg className="absolute bottom-3 left-3 w-12 h-12 opacity-0 group-hover:opacity-100 transition-all duration-500 rotate-180" viewBox="0 0 48 48">
                                                         <path d="M 2 2 L 2 20 M 2 2 L 20 2" stroke={stage.color} strokeWidth="3" fill="none" strokeLinecap="round" />
                                                     </svg>
-
-                                                    {/* Particle scatter effect on hover */}
-                                                    {[...Array(8)].map((_, i) => (
-                                                        <div
-                                                            key={i}
-                                                            className="absolute w-2 h-2 rounded-full opacity-0 group-hover:opacity-100"
-                                                            style={{
-                                                                backgroundColor: stage.color,
-                                                                top: '50%',
-                                                                left: '50%',
-                                                                animation: `particle-scatter 1.5s ease-out ${i * 0.1}s infinite`,
-                                                                transform: `rotate(${i * 45}deg) translateX(0)`,
-                                                            }}
-                                                        />
-                                                    ))}
                                                 </div>
                                             </div>
                                         </div>
@@ -685,7 +567,7 @@ export default function HowItWorksInteractive() {
                                                     {stage.scents.map((scent, idx) => (
                                                         <div
                                                             key={idx}
-                                                            className="magnetic-element group relative overflow-hidden rounded-2xl p-6 text-center cursor-pointer border-2 bg-white/5 backdrop-blur-xl transition-all duration-500 hover:shadow-2xl"
+                                                            className="group relative overflow-hidden rounded-2xl p-6 text-center cursor-pointer border-2 bg-white/5 backdrop-blur-xl transition-all duration-500 hover:shadow-2xl"
                                                             style={{
                                                                 borderColor: `${stage.color}22`,
                                                                 background: `linear-gradient(135deg, rgba(255,255,255,0.08), rgba(255,255,255,0.03))`
@@ -728,7 +610,7 @@ export default function HowItWorksInteractive() {
                                                     {stage.mounts.map((mount, idx) => (
                                                         <div
                                                             key={idx}
-                                                            className="magnetic-element group relative rounded-3xl p-8 text-center cursor-pointer border-2 backdrop-blur-2xl transition-all duration-700 hover:shadow-2xl"
+                                                            className="group relative rounded-3xl p-8 text-center cursor-pointer border-2 backdrop-blur-2xl transition-all duration-700 hover:shadow-2xl"
                                                             style={{
                                                                 borderColor: `${stage.color}33`,
                                                                 background: `linear-gradient(135deg, rgba(255,255,255,0.12), rgba(255,255,255,0.05))`,
@@ -937,17 +819,6 @@ export default function HowItWorksInteractive() {
                     }
                 }
 
-                @keyframes particle-scatter {
-                    0% {
-                        transform: rotate(var(--angle, 0deg)) translateX(0) scale(1);
-                        opacity: 1;
-                    }
-                    100% {
-                        transform: rotate(var(--angle, 0deg)) translateX(100px) scale(0);
-                        opacity: 0;
-                    }
-                }
-
                 @keyframes slideIn {
                     from {
                         transform: scaleX(0);
@@ -961,21 +832,6 @@ export default function HowItWorksInteractive() {
 
                 .animate-spin-slow {
                     animation: rotate 20s linear infinite;
-                }
-
-                .custom-cursor {
-                    pointer-events: none;
-                    z-index: 9999;
-                }
-
-                .magnetic-element {
-                    will-change: transform;
-                    transition: transform 0.2s cubic-bezier(0.23, 1, 0.32, 1);
-                }
-
-                /* Hide default cursor on interactive section */
-                .cursor-none * {
-                    cursor: none !important;
                 }
             `}</style>
         </div>

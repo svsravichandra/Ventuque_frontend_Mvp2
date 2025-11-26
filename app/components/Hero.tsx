@@ -7,9 +7,8 @@ import Image from 'next/image';
 
 export default function Hero() {
     const containerRef = useRef<HTMLDivElement>(null);
-    const canvasRef = useRef<HTMLCanvasElement>(null);
-    const cursorRef = useRef<HTMLDivElement>(null);
     const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
+    const magneticRefs = useRef<HTMLElement[]>([]);
 
     const { scrollYProgress } = useScroll({
         target: containerRef,
@@ -19,98 +18,24 @@ export default function Hero() {
     const y = useTransform(scrollYProgress, [0, 1], ['0%', '50%']);
     const opacity = useTransform(scrollYProgress, [0, 0.5], [1, 0]);
 
-    // Enhanced mouse move for parallax and magnetic effects
+    // Optimized mouse move for parallax only (removed magnetic for performance)
     const handleMouseMove = (e: MouseEvent) => {
         if (!containerRef.current) return;
         const rect = containerRef.current.getBoundingClientRect();
         const x = (e.clientX - rect.left) / rect.width - 0.5;
         const y = (e.clientY - rect.top) / rect.height - 0.5;
-        setMousePos({ x, y });
 
-        // Update custom cursor
-        if (cursorRef.current) {
-            cursorRef.current.style.left = `${e.clientX}px`;
-            cursorRef.current.style.top = `${e.clientY}px`;
+        // Throttle updates using requestAnimationFrame
+        if (!containerRef.current.dataset.ticking) {
+            window.requestAnimationFrame(() => {
+                setMousePos({ x, y });
+                if (containerRef.current) {
+                    containerRef.current.dataset.ticking = '';
+                }
+            });
+            containerRef.current.dataset.ticking = 'true';
         }
-
-        // Magnetic effect
-        const magneticElements = document.querySelectorAll('.magnetic-hero');
-        magneticElements.forEach((el) => {
-            const htmlEl = el as HTMLElement;
-            const elRect = htmlEl.getBoundingClientRect();
-            const elCenterX = elRect.left + elRect.width / 2;
-            const elCenterY = elRect.top + elRect.height / 2;
-            const deltaX = e.clientX - elCenterX;
-            const deltaY = e.clientY - elCenterY;
-            const distance = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
-            const magneticRadius = 150;
-
-            if (distance < magneticRadius) {
-                const strength = (1 - distance / magneticRadius) * 20;
-                htmlEl.style.transform = `translate(${deltaX * strength / 100}px, ${deltaY * strength / 100}px) scale(1.05)`;
-            } else {
-                htmlEl.style.transform = 'translate(0, 0) scale(1)';
-            }
-        });
     };
-
-    // Canvas particle system
-    useEffect(() => {
-        const canvas = canvasRef.current;
-        if (!canvas) return;
-
-        const ctx = canvas.getContext('2d');
-        if (!ctx) return;
-
-        const resizeCanvas = () => {
-            canvas.width = window.innerWidth;
-            canvas.height = window.innerHeight;
-        };
-        resizeCanvas();
-        window.addEventListener('resize', resizeCanvas);
-
-        let particleArray: Array<{ x: number; y: number; vx: number; vy: number; size: number; opacity: number }> = [];
-
-        // Create ambient particles
-        for (let i = 0; i < 50; i++) {
-            particleArray.push({
-                x: Math.random() * canvas.width,
-                y: Math.random() * canvas.height,
-                vx: (Math.random() - 0.5) * 0.5,
-                vy: (Math.random() - 0.5) * 0.5,
-                size: Math.random() * 3 + 1,
-                opacity: Math.random() * 0.5
-            });
-        }
-
-        const animate = () => {
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-            particleArray.forEach(particle => {
-                particle.x += particle.vx;
-                particle.y += particle.vy;
-
-                // Wrap around screen
-                if (particle.x < 0) particle.x = canvas.width;
-                if (particle.x > canvas.width) particle.x = 0;
-                if (particle.y < 0) particle.y = canvas.height;
-                if (particle.y > canvas.height) particle.y = 0;
-
-                ctx.beginPath();
-                ctx.arc(particle.x, particle.y, particle.size, 0, Math.PI * 2);
-                ctx.fillStyle = `rgba(212, 119, 60, ${particle.opacity})`;
-                ctx.fill();
-            });
-
-            requestAnimationFrame(animate);
-        };
-
-        animate();
-
-        return () => {
-            window.removeEventListener('resize', resizeCanvas);
-        };
-    }, []);
 
     useEffect(() => {
         const ctx = gsap.context(() => {
@@ -169,25 +94,7 @@ export default function Hero() {
     }, []);
 
     return (
-        <div className="relative cursor-none">
-            {/* Custom Cursor */}
-            <div
-                ref={cursorRef}
-                className="custom-cursor-hero fixed w-10 h-10 pointer-events-none z-[9999] mix-blend-difference"
-                style={{
-                    transform: 'translate(-50%, -50%)',
-                    transition: 'width 0.3s, height 0.3s'
-                }}
-            >
-                <div className="w-full h-full rounded-full border-2 border-white animate-pulse" />
-            </div>
-
-            {/* Particle Canvas */}
-            <canvas
-                ref={canvasRef}
-                className="fixed inset-0 pointer-events-none z-20 mix-blend-screen opacity-60"
-            />
-
+        <div className="relative">
             <motion.section
                 ref={containerRef}
                 style={{ y, opacity }}
@@ -242,17 +149,17 @@ export default function Hero() {
 
                     {/* Floating particles with glow */}
                     <div className="absolute inset-0">
-                        {[...Array(30)].map((_, i) => (
+                        {[...Array(12)].map((_, i) => (
                             <div
                                 key={i}
                                 className="float-element absolute rounded-full bg-accent-copper/20 backdrop-blur-sm"
                                 style={{
-                                    width: `${3 + (i % 6)}px`,
-                                    height: `${3 + (i % 6)}px`,
-                                    left: `${(i * 9) % 100}%`,
-                                    top: `${(i * 17) % 100}%`,
-                                    boxShadow: `0 0 ${15 + i % 15}px rgba(212, 119, 60, 0.6)`,
-                                    animationDelay: `${i * 0.2}s`
+                                    width: `${3 + (i % 4)}px`,
+                                    height: `${3 + (i % 4)}px`,
+                                    left: `${(i * 11) % 100}%`,
+                                    top: `${(i * 19) % 100}%`,
+                                    boxShadow: `0 0 ${15 + i % 10}px rgba(212, 119, 60, 0.5)`,
+                                    animationDelay: `${i * 0.3}s`
                                 }}
                             />
                         ))}
@@ -315,10 +222,10 @@ export default function Hero() {
                             {' '}chibi car vent figurines
                         </h2>
 
-                        {/* CTA Buttons with magnetic effect */}
+                        {/* CTA Buttons */}
                         <div className="hero-cta flex flex-col sm:flex-row gap-6 justify-center items-center">
                             <motion.button
-                                className="magnetic-hero group relative px-14 py-6 bg-gradient-to-r from-accent-copper via-accent-orange to-accent-copper rounded-full text-bg-primary font-bold text-lg overflow-hidden transition-all duration-500 shadow-[0_10px_40px_rgba(212,119,60,0.4)] will-change-transform"
+                                className="group relative px-14 py-6 bg-gradient-to-r from-accent-copper via-accent-orange to-accent-copper rounded-full text-bg-primary font-bold text-lg overflow-hidden transition-all duration-500 shadow-[0_10px_40px_rgba(212,119,60,0.4)]"
                                 whileHover={{ scale: 1.08, boxShadow: '0 0 80px rgba(212, 119, 60, 0.6)' }}
                                 whileTap={{ scale: 0.95 }}
                                 style={{ backgroundSize: '200% auto' }}
@@ -335,12 +242,10 @@ export default function Hero() {
                                         animation: 'shine-hero 3s ease-in-out infinite'
                                     }}
                                 />
-                                {/* Ripple effect */}
-                                <div className="absolute inset-0 rounded-full opacity-0 group-hover:opacity-100" style={{ animation: 'ripple-hero 2s ease-out infinite' }} />
                             </motion.button>
 
                             <motion.button
-                                className="magnetic-hero group px-14 py-6 border-2 backdrop-blur-xl rounded-full text-white font-semibold text-lg transition-all duration-500 bg-gradient-to-r from-black/40 to-black/30 shadow-[0_10px_40px_rgba(0,0,0,0.3)] will-change-transform"
+                                className="group px-14 py-6 border-2 backdrop-blur-xl rounded-full text-white font-semibold text-lg transition-all duration-500 bg-gradient-to-r from-black/40 to-black/30 shadow-[0_10px_40px_rgba(0,0,0,0.3)]"
                                 whileHover={{ scale: 1.08, boxShadow: '0 0 60px rgba(212, 119, 60, 0.4)' }}
                                 whileTap={{ scale: 0.95 }}
                                 style={{
@@ -431,14 +336,6 @@ export default function Hero() {
                     }
                 }
 
-                .cursor-none * {
-                    cursor: none !important;
-                }
-
-                .magnetic-hero {
-                    will-change: transform;
-                    transition: transform 0.3s cubic-bezier(0.23, 1, 0.32, 1);
-                }
             `}</style>
         </div>
     );

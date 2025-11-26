@@ -39,27 +39,17 @@ export default function ProductHighlights() {
     const rect = containerRef.current.getBoundingClientRect();
     const x = (e.clientX - rect.left) / rect.width - 0.5;
     const y = (e.clientY - rect.top) / rect.height - 0.5;
-    setMousePos({ x, y });
 
-    // Magnetic effect
-    const magneticElements = document.querySelectorAll('.magnetic-card');
-    magneticElements.forEach((el) => {
-      const htmlEl = el as HTMLElement;
-      const elRect = htmlEl.getBoundingClientRect();
-      const elCenterX = elRect.left + elRect.width / 2;
-      const elCenterY = elRect.top + elRect.height / 2;
-      const deltaX = e.clientX - elCenterX;
-      const deltaY = e.clientY - elCenterY;
-      const distance = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
-      const magneticRadius = 120;
-
-      if (distance < magneticRadius) {
-        const strength = (1 - distance / magneticRadius) * 15;
-        htmlEl.style.transform = `translate(${deltaX * strength / 100}px, ${deltaY * strength / 100}px) scale(1.03)`;
-      } else {
-        htmlEl.style.transform = 'translate(0, 0) scale(1)';
-      }
-    });
+    // Throttle updates
+    if (!containerRef.current.dataset.ticking) {
+      window.requestAnimationFrame(() => {
+        setMousePos({ x, y });
+        if (containerRef.current) {
+          containerRef.current.dataset.ticking = '';
+        }
+      });
+      containerRef.current.dataset.ticking = 'true';
+    }
   };
 
   useEffect(() => {

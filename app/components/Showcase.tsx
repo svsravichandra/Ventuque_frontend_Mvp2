@@ -49,27 +49,17 @@ export default function Showcase() {
         const rect = containerRef.current.getBoundingClientRect();
         const x = (e.clientX - rect.left) / rect.width - 0.5;
         const y = (e.clientY - rect.top) / rect.height - 0.5;
-        setMousePos({ x, y });
 
-        // Magnetic effect
-        const magneticElements = document.querySelectorAll('.magnetic-showcase');
-        magneticElements.forEach((el) => {
-            const htmlEl = el as HTMLElement;
-            const elRect = htmlEl.getBoundingClientRect();
-            const elCenterX = elRect.left + elRect.width / 2;
-            const elCenterY = elRect.top + elRect.height / 2;
-            const deltaX = e.clientX - elCenterX;
-            const deltaY = e.clientY - elCenterY;
-            const distance = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
-            const magneticRadius = 150;
-
-            if (distance < magneticRadius) {
-                const strength = (1 - distance / magneticRadius) * 20;
-                htmlEl.style.transform = `translate(${deltaX * strength / 100}px, ${deltaY * strength / 100}px) scale(1.05) rotateY(${deltaX * 0.05}deg) rotateX(${-deltaY * 0.05}deg)`;
-            } else {
-                htmlEl.style.transform = 'translate(0, 0) scale(1) rotateY(0deg) rotateX(0deg)';
-            }
-        });
+        // Throttle updates using requestAnimationFrame
+        if (!containerRef.current.dataset.ticking) {
+            window.requestAnimationFrame(() => {
+                setMousePos({ x, y });
+                if (containerRef.current) {
+                    containerRef.current.dataset.ticking = '';
+                }
+            });
+            containerRef.current.dataset.ticking = 'true';
+        }
     };
 
     useEffect(() => {
@@ -185,12 +175,12 @@ export default function Showcase() {
                     {showcaseItems.map((item, index) => (
                         <motion.div
                             key={index}
-                            className="showcase-item magnetic-showcase group relative aspect-square rounded-[2.5rem] overflow-hidden cursor-pointer"
+                            className="showcase-item group relative aspect-square rounded-[2.5rem] overflow-hidden cursor-pointer"
                             initial={{ opacity: 0, scale: 0.7, rotateY: -30 }}
                             animate={isInView ? { opacity: 1, scale: 1, rotateY: 0 } : {}}
                             transition={{ duration: 0.8, delay: index * 0.25, ease: 'back.out(1.5)' }}
-                            whileHover={{ scale: 1.08 }}
-                            style={{ transformStyle: 'preserve-3d', willChange: 'transform' }}
+                            whileHover={{ scale: 1.05 }}
+                            style={{ transformStyle: 'preserve-3d' }}
                         >
                             {/* Multi-layer glow effects */}
                             <div
@@ -277,21 +267,6 @@ export default function Showcase() {
                                 <svg className="absolute bottom-4 left-4 w-12 h-12 opacity-0 group-hover:opacity-100 transition-all duration-500 rotate-180" viewBox="0 0 48 48">
                                     <path d="M 2 2 L 2 18 M 2 2 L 18 2" stroke={item.color} strokeWidth="3" fill="none" strokeLinecap="round" />
                                 </svg>
-
-                                {/* Particle scatter on hover */}
-                                {[...Array(6)].map((_, i) => (
-                                    <div
-                                        key={i}
-                                        className="absolute w-2 h-2 rounded-full opacity-0 group-hover:opacity-100"
-                                        style={{
-                                            backgroundColor: item.color,
-                                            top: '50%',
-                                            left: '50%',
-                                            animation: `particle-scatter-showcase 1.5s ease-out ${i * 0.1}s infinite`,
-                                            transform: `rotate(${i * 60}deg) translateX(0)`
-                                        }}
-                                    />
-                                ))}
                             </div>
                         </motion.div>
                     ))}
@@ -358,17 +333,6 @@ export default function Showcase() {
                     }
                 }
 
-                @keyframes particle-scatter-showcase {
-                    0% {
-                        transform: rotate(var(--angle, 0deg)) translateX(0) scale(1);
-                        opacity: 1;
-                    }
-                    100% {
-                        transform: rotate(var(--angle, 0deg)) translateX(80px) scale(0);
-                        opacity: 0;
-                    }
-                }
-
                 .animate-spin-slow {
                     animation: rotate 20s linear infinite;
                 }
@@ -380,11 +344,6 @@ export default function Showcase() {
                     to {
                         transform: rotate(360deg);
                     }
-                }
-
-                .magnetic-showcase {
-                    will-change: transform;
-                    transition: transform 0.3s cubic-bezier(0.23, 1, 0.32, 1);
                 }
             `}</style>
         </section>
