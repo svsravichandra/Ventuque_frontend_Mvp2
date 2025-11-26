@@ -60,17 +60,112 @@ const stages = [
 export default function HowItWorksInteractive() {
     const sectionRef = useRef<HTMLDivElement>(null);
     const containerRef = useRef<HTMLDivElement>(null);
+    const canvasRef = useRef<HTMLCanvasElement>(null);
+    const cursorRef = useRef<HTMLDivElement>(null);
     const [currentStage, setCurrentStage] = useState(0);
     const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
+    const [particles, setParticles] = useState<Array<{ x: number; y: number; vx: number; vy: number; life: number }>>([]);
 
-    // Handle mouse move for parallax effect
+    // Enhanced mouse move for parallax, magnetic effects, and custom cursor
     const handleMouseMove = (e: MouseEvent) => {
         if (!sectionRef.current) return;
         const rect = sectionRef.current.getBoundingClientRect();
         const x = (e.clientX - rect.left) / rect.width - 0.5;
         const y = (e.clientY - rect.top) / rect.height - 0.5;
         setMousePos({ x, y });
+
+        // Update custom cursor position
+        if (cursorRef.current) {
+            cursorRef.current.style.left = `${e.clientX}px`;
+            cursorRef.current.style.top = `${e.clientY}px`;
+        }
+
+        // Magnetic effect on interactive elements
+        const magneticElements = document.querySelectorAll('.magnetic-element');
+        magneticElements.forEach((el) => {
+            const htmlEl = el as HTMLElement;
+            const elRect = htmlEl.getBoundingClientRect();
+            const elCenterX = elRect.left + elRect.width / 2;
+            const elCenterY = elRect.top + elRect.height / 2;
+            const deltaX = e.clientX - elCenterX;
+            const deltaY = e.clientY - elCenterY;
+            const distance = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
+            const magneticRadius = 120;
+
+            if (distance < magneticRadius) {
+                const strength = (1 - distance / magneticRadius) * 15;
+                htmlEl.style.transform = `translate(${deltaX * strength / 100}px, ${deltaY * strength / 100}px) scale(1.05)`;
+            } else {
+                htmlEl.style.transform = 'translate(0, 0) scale(1)';
+            }
+        });
     };
+
+    // Canvas particle animation effect
+    useEffect(() => {
+        const canvas = canvasRef.current;
+        if (!canvas) return;
+
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return;
+
+        const resizeCanvas = () => {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        };
+        resizeCanvas();
+        window.addEventListener('resize', resizeCanvas);
+
+        let particleArray: Array<{ x: number; y: number; vx: number; vy: number; life: number; color: string; size: number }> = [];
+
+        const createParticleBurst = (x: number, y: number, color: string, count = 30) => {
+            for (let i = 0; i < count; i++) {
+                const angle = (Math.PI * 2 * i) / count;
+                const velocity = 2 + Math.random() * 3;
+                particleArray.push({
+                    x,
+                    y,
+                    vx: Math.cos(angle) * velocity,
+                    vy: Math.sin(angle) * velocity,
+                    life: 1,
+                    color,
+                    size: 2 + Math.random() * 4
+                });
+            }
+        };
+
+        // Trigger particle burst on stage change
+        const triggerBurst = () => {
+            const color = stages[currentStage].color;
+            createParticleBurst(canvas.width / 2, canvas.height / 2, color, 50);
+        };
+
+        const animate = () => {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            particleArray = particleArray.filter(p => p.life > 0);
+
+            particleArray.forEach(particle => {
+                particle.x += particle.vx;
+                particle.y += particle.vy;
+                particle.vy += 0.1; // gravity
+                particle.life -= 0.01;
+
+                ctx.beginPath();
+                ctx.arc(particle.x, particle.y, particle.size, 0, Math.PI * 2);
+                ctx.fillStyle = particle.color + Math.floor(particle.life * 255).toString(16).padStart(2, '0');
+                ctx.fill();
+            });
+
+            requestAnimationFrame(animate);
+        };
+
+        animate();
+
+        return () => {
+            window.removeEventListener('resize', resizeCanvas);
+        };
+    }, [currentStage]);
 
     // Use useLayoutEffect for GSAP to prevent flash of unstyled content and ensure measurements are correct
     // We use a safe version that falls back to useEffect on the server
@@ -119,57 +214,154 @@ export default function HowItWorksInteractive() {
                 }
             });
 
-            // Enhanced transitions between slides with morphing effects
+            // Enhanced transitions with creative particle and liquid morphing effects
             for (let i = 1; i < totalSlides; i++) {
                 const slideTl = gsap.timeline();
 
                 // Different transition styles for different stages
                 if (i === 1) {
-                    // Photo to Chibi: Morphing transformation
+                    // Photo to Chibi: Particle dissolution and reformation
                     slideTl
-                        .fromTo(slides[i],
-                            { opacity: 0, visibility: 'hidden', scale: 0.8, rotateY: -45, filter: 'blur(20px) hue-rotate(0deg)' },
-                            { opacity: 1, visibility: 'visible', scale: 1, rotateY: 0, filter: 'blur(0px) hue-rotate(0deg)', duration: 1.5, ease: 'back.out(1.2)' }
+                        .to(slides[i - 1].querySelectorAll('.floating-element'),
+                            {
+                                scale: 1.5,
+                                opacity: 0,
+                                filter: 'blur(40px)',
+                                duration: 1,
+                                ease: 'power2.in',
+                                stagger: 0.1
+                            }
                         )
-                        .to(slides[i - 1],
-                            { opacity: 0, scale: 1.2, rotateY: 45, filter: 'blur(20px) hue-rotate(30deg)', duration: 1.5 },
-                            "<"
-                        );
+                        .fromTo(slides[i],
+                            {
+                                opacity: 0,
+                                visibility: 'hidden',
+                                scale: 0.3,
+                                rotateY: -90,
+                                rotateZ: -15,
+                                filter: 'blur(30px) hue-rotate(0deg) brightness(2)',
+                            },
+                            {
+                                opacity: 1,
+                                visibility: 'visible',
+                                scale: 1,
+                                rotateY: 0,
+                                rotateZ: 0,
+                                filter: 'blur(0px) hue-rotate(0deg) brightness(1)',
+                                duration: 1.5,
+                                ease: 'elastic.out(1, 0.6)',
+                            },
+                            '-=0.5'
+                        )
+                        .to(slides[i - 1], { opacity: 0, duration: 0.3 }, '<');
+
                 } else if (i === 2) {
-                    // Chibi to 3D: Spin and reveal
+                    // Chibi to 3D: Liquid morph with depth extrusion
                     slideTl
-                        .fromTo(slides[i],
-                            { opacity: 0, visibility: 'hidden', scale: 0.5, rotateY: 180, rotateX: 20, filter: 'blur(15px) brightness(0.5)' },
-                            { opacity: 1, visibility: 'visible', scale: 1, rotateY: 0, rotateX: 0, filter: 'blur(0px) brightness(1)', duration: 1.8, ease: 'power3.out' }
-                        )
                         .to(slides[i - 1],
-                            { opacity: 0, scale: 0.7, rotateY: -180, rotateX: -20, filter: 'blur(15px) brightness(1.5)', duration: 1.8 },
-                            "<"
+                            {
+                                opacity: 0,
+                                scale: 0.5,
+                                rotateX: -90,
+                                rotateY: 180,
+                                filter: 'blur(25px) brightness(3) saturate(3)',
+                                duration: 1.2,
+                                ease: 'power4.in'
+                            }
+                        )
+                        .fromTo(slides[i],
+                            {
+                                opacity: 0,
+                                visibility: 'hidden',
+                                scale: 0.1,
+                                rotateX: 90,
+                                rotateY: -180,
+                                rotateZ: 45,
+                                filter: 'blur(40px) brightness(0) contrast(2)',
+                                transformOrigin: 'center center -200px'
+                            },
+                            {
+                                opacity: 1,
+                                visibility: 'visible',
+                                scale: 1,
+                                rotateX: 0,
+                                rotateY: 0,
+                                rotateZ: 0,
+                                filter: 'blur(0px) brightness(1) contrast(1)',
+                                duration: 1.8,
+                                ease: 'expo.out',
+                                transformOrigin: 'center center 0px'
+                            },
+                            '-=0.6'
                         );
+
                 } else {
-                    // 3D to Final: Elegant fade with zoom
+                    // 3D to Final: Explosive reveal with particle scatter
                     slideTl
-                        .fromTo(slides[i],
-                            { opacity: 0, visibility: 'hidden', scale: 1.3, filter: 'blur(25px) saturate(0)' },
-                            { opacity: 1, visibility: 'visible', scale: 1, filter: 'blur(0px) saturate(1)', duration: 2, ease: 'power2.inOut' }
-                        )
                         .to(slides[i - 1],
-                            { opacity: 0, scale: 0.85, filter: 'blur(25px) saturate(2)', duration: 2 },
-                            "<"
+                            {
+                                opacity: 0,
+                                scale: 2,
+                                rotateZ: 360,
+                                filter: 'blur(50px) saturate(5) brightness(2)',
+                                duration: 1.5,
+                                ease: 'power3.in'
+                            }
+                        )
+                        .fromTo(slides[i],
+                            {
+                                opacity: 0,
+                                visibility: 'hidden',
+                                scale: 0.5,
+                                filter: 'blur(60px) saturate(0) contrast(3)',
+                            },
+                            {
+                                opacity: 1,
+                                visibility: 'visible',
+                                scale: 1,
+                                filter: 'blur(0px) saturate(1.2) contrast(1)',
+                                duration: 2,
+                                ease: 'power4.out'
+                            },
+                            '-=0.8'
                         );
                 }
 
                 tl.add(slideTl);
             }
 
-            // Floating animation for images
+            // Creative floating animation with 3D rotation
             gsap.to('.floating-element', {
-                y: -20,
-                duration: 2,
+                y: -25,
+                rotateY: 10,
+                rotateX: 5,
+                duration: 3,
                 repeat: -1,
                 yoyo: true,
                 ease: 'sine.inOut',
-                stagger: 0.1
+                stagger: {
+                    each: 0.2,
+                    from: 'random'
+                }
+            });
+
+            // Pulsing glow animation
+            gsap.to('.glow-orb', {
+                scale: 1.2,
+                opacity: 0.4,
+                duration: 2.5,
+                repeat: -1,
+                yoyo: true,
+                ease: 'power1.inOut',
+                stagger: 0.3
+            });
+
+            // Animated icon micro-interactions
+            gsap.to('.stage-icon', {
+                rotation: 360,
+                duration: 20,
+                repeat: -1,
+                ease: 'none'
             });
 
         }, sectionRef);
@@ -193,51 +385,110 @@ export default function HowItWorksInteractive() {
     }, [currentStage]);
 
     return (
-        <div className="relative w-full"> {/* Wrapper to isolate GSAP pinning from React tree */}
+        <div className="relative w-full cursor-none"> {/* Wrapper to isolate GSAP pinning from React tree */}
+            {/* Custom Cursor */}
+            <div
+                ref={cursorRef}
+                className="custom-cursor fixed w-8 h-8 pointer-events-none z-[9999] mix-blend-difference"
+                style={{
+                    transform: 'translate(-50%, -50%)',
+                    transition: 'width 0.3s, height 0.3s'
+                }}
+            >
+                <div className="w-full h-full rounded-full border-2 border-white animate-pulse" />
+            </div>
+
+            {/* Particle Canvas */}
+            <canvas
+                ref={canvasRef}
+                className="fixed inset-0 pointer-events-none z-20 mix-blend-screen"
+            />
+
             <section
                 ref={sectionRef}
-                className="relative h-screen bg-bg-primary overflow-hidden perspective-1000"
+                className="relative h-screen bg-bg-primary overflow-hidden"
+                style={{ perspective: '2000px' }}
                 onMouseMove={handleMouseMove}
             >
-                {/* Dynamic Animated Background */}
+                {/* Dynamic Animated Background with Liquid Blobs */}
                 <div className="absolute inset-0 pointer-events-none overflow-hidden">
-                    {/* Gradient orbs with smooth transitions */}
+                    {/* Liquid blob morphing backgrounds */}
                     <div
-                        className="absolute top-[-20%] left-[-10%] w-[60%] h-[60%] rounded-full blur-[120px] opacity-25 transition-all duration-[1500ms] ease-in-out"
+                        className="glow-orb absolute top-[-20%] left-[-10%] w-[70%] h-[70%] opacity-30 transition-all duration-[2000ms] ease-out"
                         style={{
                             background: stages[currentStage].bgEffect,
-                            transform: `translate(${mousePos.x * 20}px, ${mousePos.y * 20}px)`
+                            transform: `translate(${mousePos.x * 30}px, ${mousePos.y * 30}px) scale(${1 + Math.abs(mousePos.x) * 0.1})`,
+                            borderRadius: `${40 + mousePos.x * 20}% ${60 - mousePos.x * 20}% ${50 + mousePos.y * 20}% ${50 - mousePos.y * 20}%`,
+                            filter: 'blur(120px) saturate(1.5)',
+                            animation: 'morph 15s ease-in-out infinite'
                         }}
                     />
                     <div
-                        className="absolute bottom-[-20%] right-[-10%] w-[60%] h-[60%] rounded-full blur-[120px] opacity-25 transition-all duration-[1500ms] ease-in-out"
+                        className="glow-orb absolute bottom-[-20%] right-[-10%] w-[70%] h-[70%] opacity-30 transition-all duration-[2000ms] ease-out"
                         style={{
                             background: stages[currentStage].bgEffect,
-                            transform: `translate(${-mousePos.x * 20}px, ${-mousePos.y * 20}px)`
+                            transform: `translate(${-mousePos.x * 30}px, ${-mousePos.y * 30}px) rotate(${mousePos.x * 20}deg)`,
+                            borderRadius: `${60 - mousePos.y * 20}% ${40 + mousePos.y * 20}% ${50 - mousePos.x * 20}% ${50 + mousePos.x * 20}%`,
+                            filter: 'blur(120px) saturate(1.5)',
+                            animation: 'morph 18s ease-in-out infinite reverse'
                         }}
                     />
+                    <div
+                        className="glow-orb absolute top-[50%] left-[50%] w-[50%] h-[50%] -translate-x-1/2 -translate-y-1/2 opacity-20 transition-all duration-[2000ms]"
+                        style={{
+                            background: stages[currentStage].bgEffect,
+                            borderRadius: `${45 + mousePos.x * 30}% ${55 - mousePos.x * 30}% ${55 + mousePos.y * 30}% ${45 - mousePos.y * 30}%`,
+                            filter: 'blur(100px) saturate(2)',
+                            animation: 'morph 12s ease-in-out infinite'
+                        }}
+                    />
+
                     {/* Animated gradient overlay */}
                     <div
-                        className={`absolute inset-0 bg-gradient-to-br ${stages[currentStage].gradient} opacity-[0.05] transition-all duration-1000`}
+                        className={`absolute inset-0 bg-gradient-to-br ${stages[currentStage].gradient} opacity-[0.08] transition-all duration-1000`}
                     />
-                    {/* Noise texture */}
-                    <div className="absolute inset-0 bg-[url('/noise.png')] opacity-[0.03] mix-blend-overlay" />
 
-                    {/* Floating particles */}
+                    {/* Grid overlay for depth */}
+                    <div
+                        className="absolute inset-0 opacity-[0.02]"
+                        style={{
+                            backgroundImage: 'linear-gradient(rgba(255,255,255,0.1) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.1) 1px, transparent 1px)',
+                            backgroundSize: '50px 50px',
+                            transform: `perspective(1000px) rotateX(60deg) scale(2) translateY(-50%)`
+                        }}
+                    />
+
+                    {/* Noise texture */}
+                    <div className="absolute inset-0 bg-[url('/noise.png')] opacity-[0.04] mix-blend-overlay" />
+
+                    {/* Enhanced floating particles with trails */}
                     <div className="absolute inset-0">
-                        {[...Array(15)].map((_, i) => (
+                        {[...Array(25)].map((_, i) => (
                             <div
                                 key={i}
-                                className="absolute w-1 h-1 rounded-full bg-white/10"
+                                className="absolute rounded-full bg-white/10 backdrop-blur-sm"
                                 style={{
+                                    width: `${2 + (i % 5)}px`,
+                                    height: `${2 + (i % 5)}px`,
                                     left: `${(i * 7) % 100}%`,
                                     top: `${(i * 13) % 100}%`,
-                                    animation: `float ${5 + i % 5}s ease-in-out infinite`,
-                                    animationDelay: `${i * 0.2}s`
+                                    animation: `float ${4 + i % 6}s ease-in-out infinite`,
+                                    animationDelay: `${i * 0.15}s`,
+                                    boxShadow: `0 0 ${10 + i % 10}px ${stages[currentStage].color}66`
                                 }}
                             />
                         ))}
                     </div>
+
+                    {/* SVG Filter for liquid effect */}
+                    <svg className="absolute inset-0 w-0 h-0">
+                        <defs>
+                            <filter id="goo">
+                                <feGaussianBlur in="SourceGraphic" stdDeviation="10" result="blur" />
+                                <feColorMatrix in="blur" mode="matrix" values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 18 -8" result="goo" />
+                            </filter>
+                        </defs>
+                    </svg>
                 </div>
 
                 {/* Fixed Header */}
@@ -273,64 +524,133 @@ export default function HowItWorksInteractive() {
                                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-20 items-center">
                                         {/* Content */}
                                         <div className="text-center lg:text-left order-2 lg:order-1">
-                                            <div className="animate-in inline-flex items-center gap-2 px-4 py-2 rounded-full mb-8 bg-white/5 border border-white/10 backdrop-blur-md">
-                                                <span className="text-xl">{stage.icon}</span>
-                                                <span className="text-sm font-bold tracking-wider" style={{ color: stage.color }}>
+                                            <div className="animate-in magnetic-element inline-flex items-center gap-3 px-5 py-3 rounded-full mb-8 bg-gradient-to-r from-white/10 to-white/5 border border-white/20 backdrop-blur-xl shadow-lg transition-all duration-300">
+                                                <span className="stage-icon text-2xl" style={{ filter: 'drop-shadow(0 0 8px currentColor)' }}>{stage.icon}</span>
+                                                <span className="text-sm font-bold tracking-widest uppercase" style={{ color: stage.color, textShadow: `0 0 20px ${stage.color}88` }}>
                                                     STAGE 0{stage.id}
                                                 </span>
                                             </div>
-                                            <h3 className="animate-in font-display text-5xl md:text-7xl mb-6 text-white leading-tight">
+                                            <h3 className="animate-in font-display text-5xl md:text-7xl mb-6 text-white leading-tight" style={{
+                                                background: `linear-gradient(135deg, white, ${stage.color}dd, white)`,
+                                                WebkitBackgroundClip: 'text',
+                                                WebkitTextFillColor: 'transparent',
+                                                backgroundSize: '200% auto',
+                                                animation: 'shimmer 3s linear infinite'
+                                            }}>
                                                 {stage.title}
                                             </h3>
                                             <p className="animate-in text-text-secondary text-xl md:text-2xl leading-relaxed max-w-xl mx-auto lg:mx-0">
                                                 {stage.description}
                                             </p>
+
+                                            {/* Decorative elements */}
+                                            <div className="mt-8 flex gap-2 justify-center lg:justify-start">
+                                                {[...Array(3)].map((_, i) => (
+                                                    <div
+                                                        key={i}
+                                                        className="w-16 h-1 rounded-full transition-all duration-500"
+                                                        style={{
+                                                            background: `linear-gradient(90deg, transparent, ${stage.color}, transparent)`,
+                                                            opacity: 0.6,
+                                                            animation: `slideIn 1s ease-out ${i * 0.2}s backwards`
+                                                        }}
+                                                    />
+                                                ))}
+                                            </div>
                                         </div>
 
-                                        {/* Enhanced Image Card with Glow Effects */}
-                                        <div className="flex justify-center order-1 lg:order-2 perspective-1000">
-                                            <div className="floating-element relative w-full max-w-lg aspect-square">
-                                                {/* Animated glow orb */}
+                                        {/* Enhanced Image Card with 3D Depth and Magnetic Effects */}
+                                        <div className="flex justify-center order-1 lg:order-2" style={{ perspective: '1500px' }}>
+                                            <div className="floating-element magnetic-element relative w-full max-w-lg aspect-square transition-transform duration-300">
+                                                {/* Multi-layer animated glow orbs */}
                                                 <div
-                                                    className="absolute inset-0 rounded-full blur-[100px] opacity-30 transition-all duration-700 animate-pulse"
-                                                    style={{ backgroundColor: stage.color }}
+                                                    className="glow-orb absolute inset-[-20%] rounded-full opacity-40 transition-all duration-1000"
+                                                    style={{
+                                                        backgroundColor: stage.color,
+                                                        filter: 'blur(120px)',
+                                                        animation: 'pulse 4s ease-in-out infinite'
+                                                    }}
                                                 />
-                                                {/* Secondary glow for depth */}
                                                 <div
-                                                    className="absolute inset-[10%] rounded-full blur-[60px] opacity-20"
-                                                    style={{ backgroundColor: stage.color }}
+                                                    className="absolute inset-[5%] rounded-full blur-[80px] opacity-25 animate-spin-slow"
+                                                    style={{
+                                                        background: `conic-gradient(from 0deg, ${stage.color}00, ${stage.color}ff, ${stage.color}00)`,
+                                                    }}
+                                                />
+                                                <div
+                                                    className="absolute inset-[10%] rounded-full blur-[60px] opacity-30"
+                                                    style={{
+                                                        backgroundColor: stage.color,
+                                                        animation: 'pulse 3s ease-in-out infinite reverse'
+                                                    }}
                                                 />
 
-                                                {/* Main card with glassmorphism */}
-                                                <div className="relative w-full h-full rounded-[2.5rem] overflow-hidden border-2 border-white/20 bg-gradient-to-br from-white/15 via-white/10 to-white/5 backdrop-blur-2xl shadow-[0_20px_80px_rgba(0,0,0,0.3)] p-10 flex items-center justify-center group">
-                                                    {/* Shine effect */}
-                                                    <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-white/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-700" />
-
-                                                    {/* Animated border gradient */}
-                                                    <div
-                                                        className="absolute inset-0 opacity-0 group-hover:opacity-50 transition-opacity duration-500"
+                                                {/* Main 3D card with enhanced glassmorphism */}
+                                                <div
+                                                    className="relative w-full h-full rounded-[3rem] overflow-hidden border-2 backdrop-blur-3xl shadow-[0_25px_100px_rgba(0,0,0,0.4)] p-10 flex items-center justify-center group"
+                                                    style={{
+                                                        background: `linear-gradient(135deg, rgba(255,255,255,0.15), rgba(255,255,255,0.05))`,
+                                                        borderImage: `linear-gradient(135deg, ${stage.color}44, transparent, ${stage.color}44) 1`,
+                                                        transform: 'translateZ(0)',
+                                                        transformStyle: 'preserve-3d'
+                                                    }}
+                                                >
+                                                    {/* Animated shine sweep */}
+                                                    <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-1000"
                                                         style={{
-                                                            background: `linear-gradient(135deg, ${stage.color}22, transparent, ${stage.color}22)`,
+                                                            background: `linear-gradient(110deg, transparent 30%, ${stage.color}33 50%, transparent 70%)`,
+                                                            animation: 'shine 3s ease-in-out infinite'
                                                         }}
                                                     />
 
-                                                    {/* Image with enhanced effects */}
-                                                    <div className="relative w-full h-full flex items-center justify-center">
+                                                    {/* Rotating border gradient */}
+                                                    <div
+                                                        className="absolute inset-0 opacity-0 group-hover:opacity-60 transition-opacity duration-500 animate-spin-slow"
+                                                        style={{
+                                                            background: `conic-gradient(from 0deg, ${stage.color}00, ${stage.color}88, ${stage.color}00)`,
+                                                            mask: 'linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0)',
+                                                            maskComposite: 'exclude',
+                                                            padding: '2px'
+                                                        }}
+                                                    />
+
+                                                    {/* Image with 3D transform */}
+                                                    <div className="relative w-full h-full flex items-center justify-center" style={{ transformStyle: 'preserve-3d' }}>
                                                         <Image
                                                             src={stage.image}
                                                             alt={stage.title}
                                                             width={500}
                                                             height={500}
-                                                            className="object-contain drop-shadow-[0_10px_40px_rgba(0,0,0,0.5)] transition-all duration-700 group-hover:scale-110 group-hover:drop-shadow-[0_20px_60px_rgba(0,0,0,0.6)] relative z-10"
+                                                            className="object-contain transition-all duration-700 group-hover:scale-110 relative z-10"
                                                             style={{
-                                                                filter: 'contrast(1.1) saturate(1.1)'
+                                                                filter: `contrast(1.15) saturate(1.2) drop-shadow(0 15px 50px ${stage.color}88)`,
+                                                                transform: 'translateZ(50px)'
                                                             }}
                                                         />
                                                     </div>
 
-                                                    {/* Corner accents */}
-                                                    <div className="absolute top-4 right-4 w-8 h-8 border-t-2 border-r-2 border-white/30 rounded-tr-xl opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
-                                                    <div className="absolute bottom-4 left-4 w-8 h-8 border-b-2 border-l-2 border-white/30 rounded-bl-xl opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+                                                    {/* Animated corner accents with SVG */}
+                                                    <svg className="absolute top-3 right-3 w-12 h-12 opacity-0 group-hover:opacity-100 transition-all duration-500" viewBox="0 0 48 48">
+                                                        <path d="M 2 2 L 2 20 M 2 2 L 20 2" stroke={stage.color} strokeWidth="3" fill="none" strokeLinecap="round" />
+                                                    </svg>
+                                                    <svg className="absolute bottom-3 left-3 w-12 h-12 opacity-0 group-hover:opacity-100 transition-all duration-500 rotate-180" viewBox="0 0 48 48">
+                                                        <path d="M 2 2 L 2 20 M 2 2 L 20 2" stroke={stage.color} strokeWidth="3" fill="none" strokeLinecap="round" />
+                                                    </svg>
+
+                                                    {/* Particle scatter effect on hover */}
+                                                    {[...Array(8)].map((_, i) => (
+                                                        <div
+                                                            key={i}
+                                                            className="absolute w-2 h-2 rounded-full opacity-0 group-hover:opacity-100"
+                                                            style={{
+                                                                backgroundColor: stage.color,
+                                                                top: '50%',
+                                                                left: '50%',
+                                                                animation: `particle-scatter 1.5s ease-out ${i * 0.1}s infinite`,
+                                                                transform: `rotate(${i * 45}deg) translateX(0)`,
+                                                            }}
+                                                        />
+                                                    ))}
                                                 </div>
                                             </div>
                                         </div>
@@ -365,15 +685,35 @@ export default function HowItWorksInteractive() {
                                                     {stage.scents.map((scent, idx) => (
                                                         <div
                                                             key={idx}
-                                                            className="group relative overflow-hidden rounded-2xl p-6 text-center cursor-pointer border border-white/10 bg-white/5 backdrop-blur-md hover:bg-white/10 transition-all duration-300 hover:-translate-y-2 hover:shadow-2xl hover:shadow-emerald-500/20"
+                                                            className="magnetic-element group relative overflow-hidden rounded-2xl p-6 text-center cursor-pointer border-2 bg-white/5 backdrop-blur-xl transition-all duration-500 hover:shadow-2xl"
+                                                            style={{
+                                                                borderColor: `${stage.color}22`,
+                                                                background: `linear-gradient(135deg, rgba(255,255,255,0.08), rgba(255,255,255,0.03))`
+                                                            }}
                                                         >
-                                                            <div className="absolute inset-0 bg-gradient-to-br from-emerald-500/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+                                                            {/* Ripple effect on hover */}
                                                             <div
-                                                                className="w-16 h-16 rounded-full mx-auto mb-4 flex items-center justify-center text-3xl bg-gradient-to-br from-white/10 to-white/5 group-hover:scale-110 transition-transform duration-300"
+                                                                className="absolute inset-0 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-500"
+                                                                style={{
+                                                                    background: `radial-gradient(circle at center, ${stage.color}33, transparent 70%)`,
+                                                                    animation: 'ripple 2s ease-out infinite'
+                                                                }}
+                                                            />
+
+                                                            {/* Icon with glow */}
+                                                            <div
+                                                                className="relative w-16 h-16 rounded-full mx-auto mb-4 flex items-center justify-center text-3xl bg-gradient-to-br from-white/10 to-white/5 group-hover:scale-125 transition-all duration-500 group-hover:rotate-12"
+                                                                style={{
+                                                                    boxShadow: `0 0 20px ${stage.color}66`
+                                                                }}
                                                             >
-                                                                🌸
+                                                                <span style={{ filter: 'drop-shadow(0 0 10px currentColor)' }}>🌸</span>
                                                             </div>
-                                                            <p className="text-white font-semibold text-sm md:text-base tracking-wide relative z-10">{scent}</p>
+                                                            <p className="text-white font-semibold text-sm md:text-base tracking-wide relative z-10 group-hover:scale-110 transition-transform duration-300">{scent}</p>
+
+                                                            {/* Corner highlights */}
+                                                            <div className="absolute top-0 left-0 w-3 h-3 border-t-2 border-l-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300" style={{ borderColor: stage.color }} />
+                                                            <div className="absolute bottom-0 right-0 w-3 h-3 border-b-2 border-r-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300" style={{ borderColor: stage.color }} />
                                                         </div>
                                                     ))}
                                                 </div>
@@ -388,18 +728,67 @@ export default function HowItWorksInteractive() {
                                                     {stage.mounts.map((mount, idx) => (
                                                         <div
                                                             key={idx}
-                                                            className="group relative rounded-3xl p-6 text-center cursor-pointer border border-white/10 bg-white/5 backdrop-blur-md hover:bg-white/10 transition-all duration-500 hover:-translate-y-3 hover:shadow-2xl hover:shadow-teal-500/20"
+                                                            className="magnetic-element group relative rounded-3xl p-8 text-center cursor-pointer border-2 backdrop-blur-2xl transition-all duration-700 hover:shadow-2xl"
+                                                            style={{
+                                                                borderColor: `${stage.color}33`,
+                                                                background: `linear-gradient(135deg, rgba(255,255,255,0.12), rgba(255,255,255,0.05))`,
+                                                                boxShadow: `0 10px 40px ${stage.color}22`
+                                                            }}
                                                         >
-                                                            <div className="absolute inset-0 bg-gradient-to-br from-teal-500/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity rounded-3xl" />
-                                                            <div className="relative w-full aspect-square mb-6 rounded-2xl overflow-hidden bg-gradient-to-br from-white/10 to-white/5 p-8 flex items-center justify-center">
-                                                                <div className="text-6xl md:text-7xl group-hover:scale-125 transition-transform duration-500 filter drop-shadow-lg">
+                                                            {/* Animated gradient background */}
+                                                            <div
+                                                                className="absolute inset-0 rounded-3xl opacity-0 group-hover:opacity-100 transition-opacity duration-700"
+                                                                style={{
+                                                                    background: `radial-gradient(circle at 50% 50%, ${stage.color}22, transparent 70%)`,
+                                                                    animation: 'pulse 2s ease-in-out infinite'
+                                                                }}
+                                                            />
+
+                                                            {/* Icon container with 3D effect */}
+                                                            <div
+                                                                className="relative w-full aspect-square mb-6 rounded-2xl overflow-hidden p-10 flex items-center justify-center transition-all duration-700 group-hover:scale-105"
+                                                                style={{
+                                                                    background: `linear-gradient(135deg, ${stage.color}11, rgba(255,255,255,0.05))`,
+                                                                    boxShadow: `inset 0 0 30px ${stage.color}22, 0 5px 20px ${stage.color}33`,
+                                                                    transform: 'translateZ(30px)',
+                                                                    transformStyle: 'preserve-3d'
+                                                                }}
+                                                            >
+                                                                {/* Rotating glow behind icon */}
+                                                                <div
+                                                                    className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500"
+                                                                    style={{
+                                                                        background: `conic-gradient(from 0deg, transparent, ${stage.color}44, transparent)`,
+                                                                        animation: 'rotate 3s linear infinite'
+                                                                    }}
+                                                                />
+
+                                                                {/* Icon with enhanced animations */}
+                                                                <div className="relative text-6xl md:text-7xl group-hover:scale-125 transition-all duration-700 group-hover:rotate-12"
+                                                                    style={{
+                                                                        filter: `drop-shadow(0 0 20px ${stage.color}88)`,
+                                                                        transform: 'translateZ(20px)'
+                                                                    }}
+                                                                >
                                                                     {mount.icon}
                                                                 </div>
                                                             </div>
-                                                            <h4 className="font-display text-2xl md:text-3xl mb-2 text-white group-hover:text-emerald-400 transition-colors relative z-10">
+
+                                                            {/* Text content */}
+                                                            <h4 className="font-display text-2xl md:text-3xl mb-3 text-white transition-all duration-500 relative z-10 group-hover:scale-105"
+                                                                style={{
+                                                                    textShadow: `0 0 20px ${stage.color}66`
+                                                                }}
+                                                            >
                                                                 {mount.name}
                                                             </h4>
-                                                            <p className="text-text-secondary text-sm md:text-base relative z-10">{mount.desc}</p>
+                                                            <p className="text-text-secondary text-sm md:text-base relative z-10 transition-all duration-300 group-hover:text-white/80">{mount.desc}</p>
+
+                                                            {/* Decorative corner elements */}
+                                                            <div className="absolute top-2 left-2 w-4 h-4 border-t-2 border-l-2 rounded-tl-lg opacity-0 group-hover:opacity-100 transition-all duration-500" style={{ borderColor: stage.color }} />
+                                                            <div className="absolute top-2 right-2 w-4 h-4 border-t-2 border-r-2 rounded-tr-lg opacity-0 group-hover:opacity-100 transition-all duration-500" style={{ borderColor: stage.color }} />
+                                                            <div className="absolute bottom-2 left-2 w-4 h-4 border-b-2 border-l-2 rounded-bl-lg opacity-0 group-hover:opacity-100 transition-all duration-500" style={{ borderColor: stage.color }} />
+                                                            <div className="absolute bottom-2 right-2 w-4 h-4 border-b-2 border-r-2 rounded-br-lg opacity-0 group-hover:opacity-100 transition-all duration-500" style={{ borderColor: stage.color }} />
                                                         </div>
                                                     ))}
                                                 </div>
@@ -463,24 +852,24 @@ export default function HowItWorksInteractive() {
                 </div>
             </section>
 
-            {/* CSS Animations */}
+            {/* Enhanced CSS Animations */}
             <style jsx>{`
                 @keyframes float {
                     0%, 100% {
                         transform: translateY(0px) translateX(0px);
-                        opacity: 0.1;
+                        opacity: 0.15;
                     }
                     25% {
-                        transform: translateY(-20px) translateX(10px);
-                        opacity: 0.3;
+                        transform: translateY(-30px) translateX(15px);
+                        opacity: 0.4;
                     }
                     50% {
-                        transform: translateY(-40px) translateX(-10px);
-                        opacity: 0.5;
+                        transform: translateY(-50px) translateX(-15px);
+                        opacity: 0.6;
                     }
                     75% {
-                        transform: translateY(-20px) translateX(5px);
-                        opacity: 0.3;
+                        transform: translateY(-25px) translateX(8px);
+                        opacity: 0.4;
                     }
                 }
 
@@ -490,9 +879,103 @@ export default function HowItWorksInteractive() {
                         transform: scale(1);
                     }
                     50% {
-                        opacity: 0.5;
-                        transform: scale(1.05);
+                        opacity: 0.6;
+                        transform: scale(1.08);
                     }
+                }
+
+                @keyframes morph {
+                    0%, 100% {
+                        border-radius: 60% 40% 30% 70% / 60% 30% 70% 40%;
+                    }
+                    25% {
+                        border-radius: 30% 60% 70% 40% / 50% 60% 30% 60%;
+                    }
+                    50% {
+                        border-radius: 50% 60% 30% 60% / 30% 60% 70% 40%;
+                    }
+                    75% {
+                        border-radius: 60% 40% 60% 40% / 70% 30% 50% 60%;
+                    }
+                }
+
+                @keyframes shimmer {
+                    0% {
+                        background-position: -200% center;
+                    }
+                    100% {
+                        background-position: 200% center;
+                    }
+                }
+
+                @keyframes shine {
+                    0% {
+                        transform: translateX(-100%) rotate(0deg);
+                    }
+                    100% {
+                        transform: translateX(200%) rotate(20deg);
+                    }
+                }
+
+                @keyframes rotate {
+                    from {
+                        transform: rotate(0deg);
+                    }
+                    to {
+                        transform: rotate(360deg);
+                    }
+                }
+
+                @keyframes ripple {
+                    0% {
+                        transform: scale(0.8);
+                        opacity: 1;
+                    }
+                    100% {
+                        transform: scale(1.5);
+                        opacity: 0;
+                    }
+                }
+
+                @keyframes particle-scatter {
+                    0% {
+                        transform: rotate(var(--angle, 0deg)) translateX(0) scale(1);
+                        opacity: 1;
+                    }
+                    100% {
+                        transform: rotate(var(--angle, 0deg)) translateX(100px) scale(0);
+                        opacity: 0;
+                    }
+                }
+
+                @keyframes slideIn {
+                    from {
+                        transform: scaleX(0);
+                        opacity: 0;
+                    }
+                    to {
+                        transform: scaleX(1);
+                        opacity: 1;
+                    }
+                }
+
+                .animate-spin-slow {
+                    animation: rotate 20s linear infinite;
+                }
+
+                .custom-cursor {
+                    pointer-events: none;
+                    z-index: 9999;
+                }
+
+                .magnetic-element {
+                    will-change: transform;
+                    transition: transform 0.2s cubic-bezier(0.23, 1, 0.32, 1);
+                }
+
+                /* Hide default cursor on interactive section */
+                .cursor-none * {
+                    cursor: none !important;
                 }
             `}</style>
         </div>
