@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Bebas_Neue, Space_Grotesk } from 'next/font/google';
 import "./globals.css";
+import { ReduxProvider } from './providers/ReduxProvider';
 
 const bebasNeue = Bebas_Neue({
   weight: '400',
@@ -36,7 +37,9 @@ export default function RootLayout({
   return (
     <html lang="en" className={`${bebasNeue.variable} ${spaceGrotesk.variable}`}>
       <body className="antialiased">
-        {children}
+        <ReduxProvider>
+          {children}
+        </ReduxProvider>
       </body>
     </html>
   );

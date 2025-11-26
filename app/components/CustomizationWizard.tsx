@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import Image from 'next/image';
+import Model3DPreview from './Model3DPreview';
 
 export interface CustomizationOptions {
     style: string;
@@ -447,21 +447,19 @@ export default function CustomizationWizard({
                 {/* Preview Panel */}
                 <div className="lg:col-span-1">
                     <div className="sticky top-6">
-                        <div className="bg-bg-secondary rounded-3xl p-6 border border-text-secondary/20">
-                            <h3 className="font-display text-2xl mb-4">Preview</h3>
+                        {/* 3D Preview */}
+                        <div className="mb-6">
+                            <Model3DPreview
+                                photoPreview={photoPreview}
+                                style={selections.style || 'chibi'}
+                                finish={selections.finish || 'matte'}
+                                mountType={selections.mountType || 'clip'}
+                            />
+                        </div>
 
-                            {/* Photo Preview */}
-                            {photoPreview && (
-                                <div className="aspect-square rounded-2xl overflow-hidden mb-6 bg-bg-primary">
-                                    <Image
-                                        src={photoPreview}
-                                        alt="Your photo"
-                                        width={400}
-                                        height={400}
-                                        className="w-full h-full object-cover"
-                                    />
-                                </div>
-                            )}
+                        {/* Price Summary */}
+                        <div className="bg-bg-secondary rounded-3xl p-6 border border-text-secondary/20">
+                            <h3 className="font-display text-2xl mb-4">Summary</h3>
 
                             {/* Summary */}
                             <div className="space-y-3 mb-6">
